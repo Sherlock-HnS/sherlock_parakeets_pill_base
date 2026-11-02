@@ -1061,7 +1061,8 @@ else -- CLIENT HOOKS
 
         if IsValid(ent) then
             if (ent.formTable.health) then
-                local hpMax = ent.formTable.health
+                local hpMax = LocalPlayer():GetMaxHealth()
+                if hpMax <= 0 then hpMax = ent.formTable.health end
                 local hpCurrent = ent:GetPillHealth()
                 surface.SetDrawColor(Color(0, 0, 0))
                 surface.DrawRect(40, ScrH() - 80, 300, 40)

@@ -27,6 +27,15 @@ function ENT:Initialize()
     self.formTable = pk_pills.getPillTable(self:GetPillForm())
     local ply = self:GetPillUser()
 
+    -- Sherlock HnS can configure a per-pill health value without changing the
+    -- shared form definition used by every other player.
+    local healthOverride = SherlockHNS and SherlockHNS.PillHealth
+        and SherlockHNS.PillHealth[self:GetPillForm()]
+    if healthOverride and tonumber(healthOverride) then
+        self.formTable = table.Copy(self.formTable)
+        self.formTable.health = math.Clamp(math.floor(tonumber(healthOverride)), 1, 50000)
+    end
+
     if not self.formTable or not IsValid(ply) then
         self:Remove()
 

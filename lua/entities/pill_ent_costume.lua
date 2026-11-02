@@ -13,13 +13,19 @@ end
 
 function ENT:Initialize()
     self.formTable = pk_pills.getPillTable(self:GetPillForm())
-
     local ply = self:GetPillUser()
 
     if not self.formTable or not IsValid(ply) then
         self:Remove()
 
         return
+    end
+
+    local healthOverride = SherlockHNS and SherlockHNS.PillHealth
+        and SherlockHNS.PillHealth[self:GetPillForm()]
+    if healthOverride and tonumber(healthOverride) then
+        self.formTable = table.Copy(self.formTable)
+        self.formTable.health = math.Clamp(math.floor(tonumber(healthOverride)), 1, 50000)
     end
 
     local hull = self.formTable.hull or Vector(32, 32, 72)
