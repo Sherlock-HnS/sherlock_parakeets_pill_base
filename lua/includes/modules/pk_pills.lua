@@ -1,6 +1,44 @@
 AddCSLuaFile()
 -- Module starts here...
 module("pk_pills", package.seeall)
+
+-- Evita a corrida de OnEntityCreated em pills de terceiros:
+-- o callback só roda quando a entidade da pill já terminou o Initialize.
+if not _G.HNS_PillHookShim then
+    _G.HNS_PillHookShim = true
+    local origAdd = hook.Add
+
+    local READY = {
+        pill_ent_costume = function(e) return e.formTable ~= nil and isfunction(e.GetPuppet) end,
+        pill_ent_phys    = function(e) return e.formTable ~= nil end,
+    }
+
+    local function Wrap(fn)
+        return function(ent, ...)
+            local check = IsValid(ent) and READY[ent:GetClass()]
+            if not check or check(ent) then return fn(ent, ...) end
+
+            local args, n = { ... }, select("#", ...)
+            local id = "hns_pill_ready_" .. ent:EntIndex() .. "_" .. tostring(fn)
+
+            -- tenta a cada 0,05 s por até 4 s
+            timer.Create(id, 0.05, 80, function()
+                if not IsValid(ent) then
+                    timer.Remove(id)
+                elseif check(ent) then
+                    timer.Remove(id)
+                    fn(ent, unpack(args, 1, n))
+                end
+            end)
+        end
+    end
+
+    hook.Add = function(event, name, fn, ...)
+        if event == "OnEntityCreated" and isfunction(fn) then fn = Wrap(fn) end
+        return origAdd(event, name, fn, ...)
+    end
+end
+
 -- Load files
 file.CreateDir("pill_config")
 local locked_perma = {}
@@ -153,8 +191,8 @@ end
 pk_pills.speedOverrides = pk_pills.speedOverrides or {}
 
 function getMoveSpeed(t)
-    local m  = t.moveSpeed or {}
-    local ov = pk_pills.speedOverrides[t.name] or {}
+    local m    = t.moveSpeed or {}
+    local ov   = pk_pills.speedOverrides[t.name] or {}
     local walk = ov.walk or m.walk or 200
 
     return {
