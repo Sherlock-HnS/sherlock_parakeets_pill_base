@@ -189,28 +189,36 @@ end
 
 -- HNS_SPEED_PATCH: velocidades definidas pelo gamemode (pk_pills.speedOverrides[pill])
 pk_pills.speedOverrides = pk_pills.speedOverrides or {}
+pk_pills.speedNormSupport = true
 
-function getMoveSpeed(t)
+function getMoveSpeed(t, ply)
     local m    = t.moveSpeed or {}
-    local ov   = pk_pills.speedOverrides[t.name] or {}
-    local walk = ov.walk or m.walk or 200
+    local ov   = pk_pills.speedOverrides[t.name]
+    local o    = ov or {}
+    local walk = o.walk or m.walk or 200
 
-    return {
+    local sp   = {
         walk   = walk,
-        run    = ov.run or m.run or ov.walk or m.walk or 500,
-        ducked = ov.ducked or m.ducked,
-        jump   = ov.jump or t.jumpPower or 200,
+        run    = o.run or m.run or o.walk or m.walk or 500,
+        ducked = o.ducked or m.ducked,
+        jump   = o.jump or t.jumpPower or 200,
     }
+    local mod  = pk_pills.speedModifier
+    if mod then return mod(t, ply, "move", sp, ov) or sp end
+    return sp
 end
 
-function getDriveOptions(t)
-    local d = pk_pills.speedOverrides[t.name]
-    d = d and d.drive
-    if not (istable(d) and next(d)) then return t.driveOptions end
+function getDriveOptions(t, ply)
+    local ov  = pk_pills.speedOverrides[t.name]
+    local d   = ov and ov.drive
+    local out = t.driveOptions
 
-    local out = table.Copy(t.driveOptions or {})
-    for k, v in pairs(d) do out[k] = v end
-
+    if istable(d) and next(d) then
+        out = table.Copy(t.driveOptions or {})
+        for k, v in pairs(d) do out[k] = v end
+    end
+    local mod = pk_pills.speedModifier
+    if mod then return mod(t, ply, "drive", out, ov) or out end
     return out
 end
 
