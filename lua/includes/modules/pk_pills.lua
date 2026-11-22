@@ -140,6 +140,7 @@ local formsInitialized = false
 
 function register(name, t, configureHNS)
     pendingHNS[name] = nil
+    t.hnsMonster = configureHNS ~= nil or t.hnsAbilities ~= nil
     if configureHNS then
         if not formsInitialized then
             pendingHNS[name] = configureHNS
