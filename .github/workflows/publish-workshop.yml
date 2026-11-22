@@ -54,8 +54,10 @@ jobs:
           test -n "$(find sound -type f -print -quit)"
           test -s workshop-preview.png
 
-          if find . -path './.git' -prune -o -type l -print | grep -q .; then
-            echo 'O pacote contém symlinks; resolva-os antes de publicar.'
+          symlinks="$(find . -path './.git' -prune -o -type l -print -quit)"
+          if [[ -n "$symlinks" ]]; then
+            echo "O repositório contém symlink: $symlinks"
+            echo 'Resolva-o antes de publicar.'
             exit 1
           fi
 
