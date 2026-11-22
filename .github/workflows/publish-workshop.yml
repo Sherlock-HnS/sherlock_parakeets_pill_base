@@ -96,7 +96,7 @@ jobs:
           set -euo pipefail
 
           package_dir="$GITHUB_WORKSPACE/.workshop/addon"
-          rm -rf "$GITHUB_WORKSPACE/.workshop"
+          rm -rf "$package_dir"
           mkdir -p "$package_dir"
 
           cp -a lua materials sound "$package_dir/"
