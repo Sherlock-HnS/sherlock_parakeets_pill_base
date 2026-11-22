@@ -30,9 +30,11 @@ on:
 permissions:
   contents: read
 
+# A fila é compartilhada entre execuções deste repositório; não coordena os outros repositórios.
 concurrency:
   group: workshop-parakeets-pill-base-${{ github.event_name == 'pull_request' && github.ref || 'release' }}
   cancel-in-progress: false
+  queue: max
 
 jobs:
   workshop:
@@ -40,7 +42,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -88,6 +90,7 @@ jobs:
                       raise SystemExit(0)
               im = im.resize((max(1, int(im.width * .8)), max(1, int(im.height * .8))), Image.Resampling.LANCZOS)
           PY
+
       # O repositório também contém arquivos de desenvolvimento e a imagem de
       # preview. Só os diretórios do addon entram no GMA.
       - name: Preparar conteúdo limpo do Workshop
@@ -143,10 +146,26 @@ jobs:
             }
           else
             [[ "$ITEM" =~ ^[1-9][0-9]*$ ]] || {
-              echo 'Configure a variável WORKSHOP_ID ou marque create_new para a primeira publicação.'
+              echo 'Configure a variável WORKSHOP_ID ou marque create_new para criar o item.'
               exit 1
             }
           fi
+
+      - name: Conferir acesso da conta Steam
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && vars.WORKSHOP_ID != ''))
+        env:
+          USER_SET: ${{ secrets.STEAM_USER != '' }}
+          PASS_SET: ${{ secrets.STEAM_PASS != '' }}
+          GUARD_SET: ${{ secrets.STEAM_SHARED_SECRET != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in USER_SET PASS_SET GUARD_SET; do
+            if [[ "${!key}" != true ]]; then
+              echo "::error::Credencial indisponível ($key)"
+              exit 1
+            fi
+          done
 
       - name: Publicar Parakeets Pill Base
         id: publish
