@@ -134,7 +134,19 @@ end
 local forms = {}
 pk_pills.Forms = forms
 
-function register(name, t)
+-- Autorun files can register forms before the gamemode has loaded.
+local pendingHNS = {}
+local formsInitialized = false
+
+function register(name, t, configureHNS)
+    pendingHNS[name] = nil
+    if configureHNS then
+        if not formsInitialized then
+            pendingHNS[name] = configureHNS
+        elseif SherlockHNS then
+            configureHNS(t)
+        end
+    end
     t.name = name
 
     if t.printName then
@@ -191,17 +203,116 @@ end
 pk_pills.speedOverrides = pk_pills.speedOverrides or {}
 pk_pills.speedNormSupport = true
 
+-- Some monster controls use physical keys (number row, G, T) without an IN_*.
+-- Keep those bindings and let Ability.Use validate them on the server.
+function setHNSCooldown(ent, id, seconds)
+    if not SERVER or not SherlockHNS or not IsValid(ent) then return end
+    local ply = ent:GetPillUser()
+    if IsValid(ply) and getMappedEnt(ply) == ent then
+        SherlockHNS.Ability.SetCooldown(ply, id, seconds)
+    end
+end
+
+function bindHNSButtons(form, field, definitions)
+    local original = form[field]
+    local byButton = {}
+    for _, def in ipairs(definitions) do
+        local button = def.button
+        byButton[button] = def.id
+        def.OnUse = function(ply, ent) return original(ply, ent, button) end
+        table.insert(form.hnsAbilities, def)
+    end
+    form[field] = function(ply, ent, button)
+        local id = byButton[button]
+        if not id then return original(ply, ent, button) end
+        if SERVER then return SherlockHNS.Ability.Use(ply, id) end
+    end
+end
+
+-- The gamemode owns the locks, targeting, cancellation and death.
+-- The pack only manages the puppet animation and the existing camera messages.
+local activeJumpscares = {}
+if SERVER then
+    hook.Add("SherlockHNS_RoundEnded", "pk_pills_cancel_jumpscares", function()
+        for victim in pairs(activeJumpscares) do SherlockHNS.CancelPending(victim) end
+    end)
+end
+
+function playHNSJumpscare(ply, ent, victim, duration, options)
+    if not SERVER or not SherlockHNS or not IsValid(ent) then return false end
+    local puppet = ent:GetPuppet()
+    if not IsValid(puppet) then return false end
+    local active = false
+    local restoreVisuals
+    local removeKey = "hns_jumpscare_" .. victim:EntIndex()
+    local function camera(recipient, channel, enabled, attachment)
+        if not channel or not IsValid(recipient) then return end
+        net.Start(channel)
+        net.WriteEntity(IsValid(puppet) and puppet or NULL)
+        net.WriteBool(enabled)
+        if attachment then net.WriteString(enabled and attachment or "") end
+        net.Send(recipient)
+    end
+    local function finish()
+        if not active then return end
+        active = false
+        activeJumpscares[victim] = nil
+        if restoreVisuals then xpcall(restoreVisuals, ErrorNoHaltWithStack) end
+        if IsValid(ent) then ent:RemoveCallOnRemove(removeKey) end
+        camera(victim, options.camera, false, options.attachment)
+        camera(ply, options.ownerCamera, false, options.ownerAttachment)
+        if options.onEnd then options.onEnd() end
+    end
+    duration = math.max(engine.TickInterval(), duration)
+    return SherlockHNS.KillWithDelay(victim, ply, duration, {
+        reason = "jumpscare",
+        inflictor = ent,
+        onCancel = finish,
+        onStart = function()
+            active = true
+            activeJumpscares[victim] = true
+            ent:CallOnRemove(removeKey, function()
+                if active then SherlockHNS.CancelPending(victim) end
+            end)
+            -- The API also revalidates at expiry. Always close the camera,
+            -- even when a shield blocks the kill or infection replaces it.
+            timer.Simple(duration, finish)
+            if options.offset then victim:SetPos(puppet:GetPos() + puppet:GetForward() * options.offset) end
+            camera(victim, options.camera, true, options.attachment)
+            camera(ply, options.ownerCamera, true, options.ownerAttachment)
+            if options.animation then ent:PillAnim(options.animation) end
+            if options.sound then ent:PillSound(options.sound) end
+            if options.onStart then
+                local ok, cleanup = xpcall(function() return options.onStart(victim) end, ErrorNoHaltWithStack)
+                if ok and isfunction(cleanup) then restoreVisuals = cleanup end
+            end
+        end,
+    })
+end
+
+-- Per-costume defaults for abilities and stances. Admin overrides win.
+function setCostumeMoveSpeed(ent, walk, run, ducked, jump)
+    if not SERVER or not IsValid(ent) or not ent.ApplyMoveSpeed then return end
+    local state = ent.pillMoveSpeed
+    if state and state.walk == walk and state.run == run
+        and state.ducked == ducked and state.jump == jump then return end
+    ent.pillMoveSpeed = { walk = walk, run = run, ducked = ducked, jump = jump }
+    ent:ApplyMoveSpeed()
+end
+
 function getMoveSpeed(t, ply)
+    local ent = IsValid(ply) and getMappedEnt(ply)
+    local state = IsValid(ent) and ent.formTable == t and ent.pillMoveSpeed or {}
     local m    = t.moveSpeed or {}
     local ov   = pk_pills.speedOverrides[t.name]
     local o    = ov or {}
-    local walk = o.walk or m.walk or 200
+    local walk = o.walk or state.walk or m.walk or 200
 
     local sp   = {
         walk   = walk,
-        run    = o.run or m.run or o.walk or m.walk or 500,
-        ducked = o.ducked or m.ducked,
-        jump   = o.jump or t.jumpPower or 200,
+        run    = o.run or state.run or m.run or o.walk or state.walk or m.walk or 500,
+        ducked = o.ducked or state.ducked or m.ducked,
+        jump   = o.jump or state.jump or t.jumpPower or 200,
     }
     local mod  = pk_pills.speedModifier
     if mod then return mod(t, ply, "move", sp, ov) or sp end
@@ -233,6 +344,14 @@ function getRandomForm()
 end
 
 hook.Add("Initialize", "pk_pill_finalize", function()
+    formsInitialized = true
+    if SherlockHNS then
+        for name, configure in pairs(pendingHNS) do
+            xpcall(function() configure(forms[name]) end, ErrorNoHaltWithStack)
+        end
+    end
+    pendingHNS = {}
+
     for n, t in pairs(forms) do
         if t.parent then
             fixParent(n)

@@ -304,11 +304,12 @@ if SERVER then
         if not IsValid(ply) then return end
 
         local ft = self.formTable
-        local sp = pk_pills.getMoveSpeed(ft)
+        local sp = pk_pills.getMoveSpeed(ft, ply)
         local duckBy = ft.duckBy or (ft.hull and 0 or 36)
 
-        ply:SetWalkSpeed(sp.walk)
-        ply:SetRunSpeed(sp.run)
+        local scale = self.animFreeze and 0.5 or 1
+        ply:SetWalkSpeed(sp.walk * scale)
+        ply:SetRunSpeed(sp.run * scale)
 
         if sp.ducked then
             ply:SetCrouchedWalkSpeed(sp.ducked / sp.walk)
@@ -342,8 +343,7 @@ function ENT:Think()
         end
 
         if self.animFreeze and not self.plyFrozen then
-            ply:SetWalkSpeed(ply:GetWalkSpeed() / 2)
-            ply:SetRunSpeed(ply:GetWalkSpeed() / 2)
+            self:ApplyMoveSpeed()
             self.plyFrozen = true
         elseif not self.animFreeze and self.plyFrozen then
             self:ApplyMoveSpeed()
