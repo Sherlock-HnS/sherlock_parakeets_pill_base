@@ -1,0 +1,88 @@
+name: Parakeets Pill Base Workshop
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    paths:
+      - 'lua/**'
+      - 'materials/**'
+      - 'sound/**'
+      - '.github/workflows/publish-workshop.yml'
+  workflow_dispatch:
+    inputs:
+      create_new:
+        description: Criar o primeiro item do addon no Workshop
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workshop-parakeets-pill-base-${{ github.event_name == 'pull_request' && github.ref || 'release' }}
+  cancel-in-progress: false
+
+jobs:
+  workshop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Conferir arquivos do pacote
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d lua
+          test -d materials
+          test -d sound
+          test -n "$(find lua -type f -name '*.lua' -print -quit)"
+          test -n "$(find materials -type f -print -quit)"
+          test -n "$(find sound -type f -print -quit)"
+          if find . -path './.git' -prune -o -type l -print | grep .; then exit 1; fi
+
+      - name: Validar GMA sem enviar à Steam
+        uses: linventif/gmod-workshop-cicd@923dae0a327040b2f01cf6876cbecbbb97462bdf
+        with:
+          steam_user: ''
+          steam_pass: ''
+          content_path: .
+          title: Parakeets Pill Base
+          description: Pacote de personagens pill para o servidor Sherlock HnS.
+          dry_run: 'true'
+
+      - name: Validar destino da publicação
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && vars.WORKSHOP_ID != '')
+        env:
+          ITEM: ${{ vars.WORKSHOP_ID }}
+          CREATE: ${{ inputs.create_new }}
+        run: |
+          set -eu
+          if [ "$CREATE" = true ]; then
+            test -z "$ITEM" || { echo 'WORKSHOP_ID já configurado'; exit 1; }
+          else
+            [[ "$ITEM" =~ ^[1-9][0-9]*$ ]] || { echo 'Configure WORKSHOP_ID ou use create_new'; exit 1; }
+          fi
+
+      - name: Publicar Parakeets Pill Base
+        id: publish
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && vars.WORKSHOP_ID != '')
+        uses: linventif/gmod-workshop-cicd@923dae0a327040b2f01cf6876cbecbbb97462bdf
+        with:
+          steam_user: ${{ secrets.STEAM_USER }}
+          steam_pass: ${{ secrets.STEAM_PASS }}
+          steam_shared_secret: ${{ secrets.STEAM_SHARED_SECRET }}
+          published_file_id: ${{ inputs.create_new && '0' || vars.WORKSHOP_ID }}
+          content_path: .
+          title: Parakeets Pill Base
+          description: Pacote de personagens pill para o servidor Sherlock HnS.
+          visibility: '0'
+          change_note: Atualização do addon Parakeets Pill Base
+
+      - name: Registrar ID da Workshop
+        if: steps.publish.outcome == 'success'
+        env:
+          ITEM: ${{ steps.publish.outputs.published_file_id }}
+        run: echo "Workshop ID do Parakeets Pill Base = $ITEM" >> "$GITHUB_STEP_SUMMARY"
