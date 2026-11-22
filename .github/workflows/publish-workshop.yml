@@ -19,9 +19,13 @@ on:
   workflow_dispatch:
     inputs:
       create_new:
-        description: Criar o primeiro item do addon no Workshop
+        description: Criar um novo item no Workshop (não usar se já existe um item criado)
         type: boolean
         default: false
+      workshop_id:
+        description: ID de um item existente/draft que deseja publicar ou atualizar
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -61,6 +65,29 @@ jobs:
             exit 1
           fi
 
+      - name: Instalar Pillow
+        run: python -m pip install --quiet pillow
+
+      - name: Preparar preview otimizado
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .workshop
+          python - <<'PY'
+          from PIL import Image
+          from pathlib import Path
+          src = Path("workshop-preview.png")
+          dst = Path(".workshop/workshop-preview.jpg")
+          im = Image.open(src).convert("RGB")
+          im.thumbnail((512, 512))
+          while True:
+              for quality in (85, 75, 65, 55, 45):
+                  im.save(dst, "JPEG", quality=quality, optimize=True, progressive=True)
+                  if dst.stat().st_size <= 450_000:
+                      print(f"Preview: {dst.stat().st_size} bytes (quality={quality}, size={im.size})")
+                      raise SystemExit(0)
+              im = im.resize((max(1, int(im.width * .8)), max(1, int(im.height * .8))), Image.Resampling.LANCZOS)
+          PY
       # O repositório também contém arquivos de desenvolvimento e a imagem de
       # preview. Só os diretórios do addon entram no GMA.
       - name: Preparar conteúdo limpo do Workshop
@@ -90,7 +117,7 @@ jobs:
           steam_user: dry-run
           steam_pass: dry-run
           content_path: .workshop/addon
-          preview_file: workshop-preview.png
+          preview_file: .workshop/workshop-preview.jpg
           title: Parakeets Pill Base
           description: Base de pills Parakeets modificada para o servidor Sherlock HnS.
           dry_run: 'true'
@@ -98,7 +125,7 @@ jobs:
       - name: Validar destino da publicação
         if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && vars.WORKSHOP_ID != '')
         env:
-          ITEM: ${{ vars.WORKSHOP_ID }}
+          ITEM: ${{ inputs.workshop_id || vars.WORKSHOP_ID }}
           CREATE: ${{ inputs.create_new }}
         shell: bash
         run: |
@@ -129,9 +156,9 @@ jobs:
           steam_user: ${{ secrets.STEAM_USER }}
           steam_pass: ${{ secrets.STEAM_PASS }}
           steam_shared_secret: ${{ secrets.STEAM_SHARED_SECRET }}
-          published_file_id: ${{ inputs.create_new && '0' || vars.WORKSHOP_ID }}
+          published_file_id: ${{ inputs.create_new && '0' || inputs.workshop_id || vars.WORKSHOP_ID }}
           content_path: .workshop/addon
-          preview_file: workshop-preview.png
+          preview_file: .workshop/workshop-preview.jpg
           title: Parakeets Pill Base
           description: Base de pills Parakeets modificada para o servidor Sherlock HnS.
           visibility: '0'
@@ -147,7 +174,7 @@ jobs:
             echo
             echo "Workshop ID: [$ITEM](https://steamcommunity.com/sharedfiles/filedetails/?id=$ITEM)"
             echo
-            echo 'Para as próximas atualizações automáticas, configure a variável de repositório `WORKSHOP_ID` com esse ID.'
+            echo 'Para as próximas atualizações automáticas, configure a variável de repositório `WORKSHOP_ID` com esse ID, ou informe-o em `workshop_id` ao executar manualmente.'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Informar publicação automática desativada
