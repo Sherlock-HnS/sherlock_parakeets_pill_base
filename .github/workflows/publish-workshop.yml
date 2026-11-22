@@ -49,6 +49,7 @@ jobs:
           steam_user: ''
           steam_pass: ''
           content_path: .
+          preview_file: workshop-preview.png
           title: Parakeets Pill Base
           description: Pacote de personagens pill para o servidor Sherlock HnS.
           dry_run: 'true'
