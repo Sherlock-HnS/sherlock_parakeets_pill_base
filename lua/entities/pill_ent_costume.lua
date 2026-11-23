@@ -63,6 +63,13 @@ function ENT:Initialize()
         ply:SetStepSize(hull.z / 4)
         ply:SetViewOffset(camOffset)
         ply:SetViewOffsetDucked(camOffset - Vector(0, 0, duckBy))
+        -- Preserve the player's movement settings before applying pill-specific values.
+        self.originalMoveSpeed = {
+            walk = ply:GetWalkSpeed(),
+            run = ply:GetRunSpeed(),
+            crouched = ply:GetCrouchedWalkSpeed(),
+            jump = ply:GetJumpPower(),
+        }
         self:ApplyMoveSpeed()
         self.loopingSounds = {}
 
@@ -275,6 +282,14 @@ function ENT:OnRemove()
                 ply:StripWeapons()
                 ply:StripAmmo()
                 ply:Spawn()
+                -- Restore the settings captured before morphing once the final pill is removed.
+                if not newType and self.originalMoveSpeed then
+                    local movement = self.originalMoveSpeed
+                    ply:SetWalkSpeed(movement.walk)
+                    ply:SetRunSpeed(movement.run)
+                    ply:SetCrouchedWalkSpeed(movement.crouched)
+                    ply:SetJumpPower(movement.jump)
+                end
                 ply:SetEyeAngles(angs)
                 ply:SetPos(pos)
                 ply:SetVelocity(vel)
