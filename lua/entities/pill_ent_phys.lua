@@ -138,7 +138,7 @@ function ENT:Initialize()
 
         self.drive = {
             functions = pk_pills.getDrive(self.formTable.driveType),
-            options = pk_pills.getDriveOptions(self.formTable)
+            options = pk_pills.getDriveOptions(self.formTable, ply)
         }
 
         self.loopingSounds = {}
@@ -200,7 +200,8 @@ function ENT:Initialize()
             local t = self.formTable.trail
             local start = t.width or 40
             local endd = start / 2
-            util.SpriteTrail(self, 0, t.color or Color(255, 255, 255), false, start, endd, t.length or 4, 1 / (start + endd) * .5, t.texture)
+            util.SpriteTrail(self, 0, t.color or Color(255, 255, 255), false, start, endd, t.length or 4,
+                1 / (start + endd) * .5, t.texture)
         end
 
         if self.formTable.bodyGroups then
@@ -210,7 +211,8 @@ function ENT:Initialize()
         end
 
         local mins, maxs = self:GetCollisionBounds()
-        local points = {Vector(mins.x, 0, 0), Vector(0, mins.y, 0), Vector(0, 0, mins.z), Vector(maxs.x, 0, 0), Vector(0, maxs.y, 0), Vector(0, 0, maxs.z)}
+        local points = { Vector(mins.x, 0, 0), Vector(0, mins.y, 0), Vector(0, 0, mins.z), Vector(maxs.x, 0, 0), Vector(
+        0, maxs.y, 0), Vector(0, 0, maxs.z) }
         self:AddFlags(FL_OBJECT)
         pk_pills.setAiTeam(self, self.formTable.side or "default")
         self:SetOwner(ply)
@@ -226,7 +228,7 @@ function ENT:Initialize()
 
             --Compatibility with Gmod Legs
             --ply.ShouldDisableLegs=true
-            self.camTraceFilter = {self}
+            self.camTraceFilter = { self }
         end
     end
 end
@@ -538,9 +540,11 @@ function ENT:PillSound(name, bulk)
 
     if isstring(s) then
         if bulk then
-            sound.Play(s, self:GetPos(), self.formTable.sounds[name .. "_level"] or 100, self.formTable.sounds[name .. "_pitch"] or 100, 1)
+            sound.Play(s, self:GetPos(), self.formTable.sounds[name .. "_level"] or 100,
+                self.formTable.sounds[name .. "_pitch"] or 100, 1)
         else
-            self:EmitSound(s, self.formTable.sounds[name .. "_level"] or 100, self.formTable.sounds[name .. "_pitch"] or 100)
+            self:EmitSound(s, self.formTable.sounds[name .. "_level"] or 100,
+                self.formTable.sounds[name .. "_pitch"] or 100)
         end
 
         return true
@@ -592,11 +596,13 @@ function ENT:Draw()
             local size = self.formTable.sprite.size or 40
             cam.Start3D(EyePos(), EyeAngles())
             render.SetMaterial(self.spriteMat)
-            render.DrawSprite(self:GetPos() + (self.formTable.sprite.offset or Vector(0, 0, 0)), size, size, self.formTable.sprite.color or Color(255, 255, 255))
+            render.DrawSprite(self:GetPos() + (self.formTable.sprite.offset or Vector(0, 0, 0)), size, size,
+                self.formTable.sprite.color or Color(255, 255, 255))
             cam.End3D()
         else
             self:DrawModel()
         end
     end
 end
+
 -- HNS_SPEED_PATCH

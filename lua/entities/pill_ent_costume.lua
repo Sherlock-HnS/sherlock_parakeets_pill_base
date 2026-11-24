@@ -319,7 +319,7 @@ if SERVER then
         if not IsValid(ply) then return end
 
         local ft = self.formTable
-        local sp = pk_pills.getMoveSpeed(ft, ft.hnsMonster and ply or nil)
+        local sp = pk_pills.getMoveSpeed(ft, ply)
         local duckBy = ft.duckBy or (ft.hull and 0 or 36)
 
         local scale = ft.hnsMonster and self.animFreeze and 0.5 or 1
@@ -347,7 +347,9 @@ function ENT:Think()
     if SERVER then
         --Anims
         local anims = table.Copy(self.formTable.anims.default or {})
-        table.Merge(anims, (IsValid(ply:GetActiveWeapon()) and self.formTable.anims[ply:GetActiveWeapon():GetHoldType()]) or (self.forceAnimSet and self.formTable.anims[self.forceAnimSet]) or {})
+        table.Merge(anims,
+            (IsValid(ply:GetActiveWeapon()) and self.formTable.anims[ply:GetActiveWeapon():GetHoldType()]) or
+            (self.forceAnimSet and self.formTable.anims[self.forceAnimSet]) or {})
         local anim
         --local useSeqVel=true
         local overrideRate
@@ -584,7 +586,8 @@ function ENT:Think()
                 local charge = self.formTable.charge
                 local angs = ply:EyeAngles()
                 self:PillAnimTick("charge_loop")
-                local hit_ent = ply:TraceHullAttack(ply:EyePos(), ply:EyePos() + angs:Forward() * 100, Vector(-20, -20, -20), Vector(20, 20, 20), charge.dmg, DMG_CRUSH, 1, true)
+                local hit_ent = ply:TraceHullAttack(ply:EyePos(), ply:EyePos() + angs:Forward() * 100,
+                    Vector(-20, -20, -20), Vector(20, 20, 20), charge.dmg, DMG_CRUSH, 1, true)
 
                 if IsValid(hit_ent) then
                     self:PillAnim("charge_hit", true)
@@ -842,7 +845,8 @@ if SERVER then
         local puppet = self:GetPuppet()
         if not IsValid(puppet) then return end
         local anims = table.Copy(self.formTable.anims.default or {})
-        table.Merge(anims, IsValid(ply:GetActiveWeapon()) and self.formTable.anims[ply:GetActiveWeapon():GetHoldType()] or {})
+        table.Merge(anims,
+            IsValid(ply:GetActiveWeapon()) and self.formTable.anims[ply:GetActiveWeapon():GetHoldType()] or {})
         local gesture = anims["g_" .. name]
 
         if gesture then
@@ -894,9 +898,11 @@ function ENT:PillSound(name, bulk)
 
     if isstring(s) then
         if bulk then
-            sound.Play(s, self:GetPos(), self.formTable.sounds[name .. "_level"] or (name == "step" and 75 or 100), self.formTable.sounds[name .. "_pitch"] or 100, 1)
+            sound.Play(s, self:GetPos(), self.formTable.sounds[name .. "_level"] or (name == "step" and 75 or 100),
+                self.formTable.sounds[name .. "_pitch"] or 100, 1)
         else
-            self:EmitSound(s, self.formTable.sounds[name .. "_level"] or (name == "step" and 75 or 100), self.formTable.sounds[name .. "_pitch"] or 100)
+            self:EmitSound(s, self.formTable.sounds[name .. "_level"] or (name == "step" and 75 or 100),
+                self.formTable.sounds[name .. "_pitch"] or 100)
         end
 
         return true
@@ -961,17 +967,17 @@ function ENT:Draw()
     --[[local puppet = self:GetPuppet()
 	local ply = self:GetPillUser()
 	local vel=ply:GetVelocity():Length()
-	
+
 	if IsValid(puppet) then
 		puppet:SetRenderOrigin(ply:GetPos())
-		
+
 		if vel>0||math.abs(math.AngleDifference(puppet:GetAngles().y,ply:EyeAngles().y))>60 then
 			local angs=ply:EyeAngles()
 			angs.p=0
-			
+
 			puppet:SetRenderAngles(angs)
 		end
 	end
-	
+
 	puppet:DrawModel()]]
 end
