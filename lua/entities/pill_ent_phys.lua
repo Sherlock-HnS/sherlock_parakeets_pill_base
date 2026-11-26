@@ -333,8 +333,18 @@ else
         end
 
         if self.formTable.boneMorphs then
+            local boneCache = self.boneCache
+            if not boneCache then
+                boneCache = {}
+                self.boneCache = boneCache
+            end
+
             for k, v in pairs(self.formTable.boneMorphs) do
-                local b = self:LookupBone(k)
+                local b = boneCache[k]
+                if b == nil then
+                    b = self:LookupBone(k)
+                    boneCache[k] = b or false
+                end
 
                 if b then
                     if isfunction(v) then
