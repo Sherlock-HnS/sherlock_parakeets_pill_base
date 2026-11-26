@@ -345,11 +345,26 @@ function ENT:Think()
     local vel = ply:GetVelocity():Length()
 
     if SERVER then
-        --Anims
-        local anims = table.Copy(self.formTable.anims.default or {})
-        table.Merge(anims,
-            (IsValid(ply:GetActiveWeapon()) and self.formTable.anims[ply:GetActiveWeapon():GetHoldType()]) or
-            (self.forceAnimSet and self.formTable.anims[self.forceAnimSet]) or {})
+        -- Animações: a tabela mesclada é reutilizada enquanto o override for o mesmo.
+        local ft = self.formTable
+        local wep = ply:GetActiveWeapon()
+        local over = (IsValid(wep) and ft.anims[wep:GetHoldType()])
+            or (self.forceAnimSet and ft.anims[self.forceAnimSet])
+            or false
+
+        local cache = self.animCache
+        if not cache then
+            cache = {}
+            self.animCache = cache
+        end
+
+        local anims = cache[over]
+        if not anims then
+            anims = table.Copy(ft.anims.default or {})
+            if over then table.Merge(anims, over) end
+            cache[over] = anims
+        end
+
         local anim
         --local useSeqVel=true
         local overrideRate
@@ -421,8 +436,22 @@ function ENT:Think()
             overrideRate = 1
         end
 
-        if (anim and puppet:GetSequence() ~= puppet:LookupSequence(anim)) or self.animStart or (self.formTable.autoRestartAnims and puppet:GetCycle() == 1) then
-            puppet:ResetSequence(puppet:LookupSequence(anim))
+        -- O puppet desta pill mantém o mesmo modelo; LookupSequence é estável por nome.
+        local seqCache = self.seqCache
+        if not seqCache or self.seqCachePuppet ~= puppet then
+            seqCache = {}
+            self.seqCache = seqCache
+            self.seqCachePuppet = puppet
+        end
+
+        local seq = anim and seqCache[anim]
+        if anim and seq == nil then
+            seq = puppet:LookupSequence(anim)
+            seqCache[anim] = seq
+        end
+
+        if (anim and puppet:GetSequence() ~= seq) or self.animStart or (self.formTable.autoRestartAnims and puppet:GetCycle() == 1) then
+            puppet:ResetSequence(seq or puppet:LookupSequence(anim))
             puppet:SetCycle(0)
             self.animCycle = 0
         end
